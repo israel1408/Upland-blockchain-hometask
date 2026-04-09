@@ -13,8 +13,17 @@ export const fetchPendingTransactions = () =>
 export const fetchAllTransactions = () =>
   client.get(ENDPOINTS.TRANSACTIONS_ALL);
 
-export const addTransaction = (fromAddress, toAddress, amount) =>
-  client.post(ENDPOINTS.TRANSACTIONS, { fromAddress, toAddress, amount });
+// src/api/blockchain.api.js
+
+
+export const addTransaction = (from, to, amount, privateKey) => {
+  return client.post('/api/transactions', {
+    fromAddress: from,
+    toAddress: to,
+    amount,
+    privateKey, // send to backend
+  });
+};
 
 export const mineBlock = (miningRewardAddress = 'miner1') =>
   client.post(ENDPOINTS.MINE, { miningRewardAddress });

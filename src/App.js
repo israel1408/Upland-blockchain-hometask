@@ -9,6 +9,8 @@ import Header from './components/Header';
 import useBlockchain from './hooks/useBlockchain';
 import { mineBlock } from './api/blockchain.api';
 
+import Wallet from './components/Wallet'; // new import
+
 function App() {
   const { chain, stats, loading, error, refresh } = useBlockchain();
 
@@ -43,6 +45,7 @@ function App() {
         <div className="main-content">
           <div className="left-panel">
             <StatsPanel stats={stats} onMine={handleMine} />
+            <Wallet />
             <TransactionForm onTransactionAdded={refresh} />
           </div>
 

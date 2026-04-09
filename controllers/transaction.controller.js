@@ -1,33 +1,32 @@
+const crypto = require('crypto');
 const { blockchain, Transaction } = require('../models');
 const { sendSuccess, sendCreated, sendError } = require('../utils/response');
 const { isValidAddress, isValidAmount, sanitizeAddress, sanitizeAmount } = require('../utils/validator');
 
-const addTransaction = (req, res, next) => {
+const addTransaction = (req, res) => {
   try {
-    const { fromAddress, toAddress, amount } = req.body;
+    const { fromAddress, toAddress, amount, privateKey } = req.body;
 
-    if (!isValidAddress(fromAddress) || !isValidAddress(toAddress)) {
-      return sendError(res, 'Invalid wallet address format', 400);
+    const transaction = new Transaction(fromAddress, toAddress, amount);
+
+    //sign transaction using private key
+    if (privateKey) {
+      const sign = crypto.createSign('SHA256');
+      sign.update(transaction.calculateHash());
+      sign.end();
+
+      transaction.signature = sign.sign(privateKey, 'hex');
     }
-
-    if (!isValidAmount(amount)) {
-      return sendError(res, 'Amount must be a positive number', 400);
-    }
-
-    const transaction = new Transaction(
-      sanitizeAddress(fromAddress),
-      sanitizeAddress(toAddress),
-      sanitizeAmount(amount)
-    );
 
     blockchain.addTransaction(transaction);
 
-    sendCreated(res, {
-      message: 'Transaction added to pending pool',
-      transaction,
-    });
+    return sendSuccess(res, transaction);
   } catch (err) {
-    next(err);
+    console.log(err.response?.data);
+
+    return(
+      JSON.stringify(err.response?.data, null, 2)
+    );
   }
 };
 

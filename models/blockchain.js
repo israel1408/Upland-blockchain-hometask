@@ -14,9 +14,9 @@ class Block {
       .createHash('sha256')
       .update(
         this.previousHash +
-          this.timestamp +
-          JSON.stringify(this.transactions) +
-          this.nonce
+        this.timestamp +
+        JSON.stringify(this.transactions) +
+        this.nonce
       )
       .digest('hex');
   }
@@ -56,36 +56,43 @@ class Transaction {
       .digest('hex');
   }
 
-  signTransaction(signingKey) {
-    if (signingKey.getPublic('hex') !== this.fromAddress) {
-      throw new Error('You cannot sign transactions for other wallets!');
-    }
+  signTransaction(privateKey) {
+    const sign = crypto.createSign('SHA256');
+    sign.update(this.calculateHash());
+    sign.end();
 
-    const hashTx = this.calculateHash();
-    const sig = signingKey.sign(hashTx, 'base64');
-    this.signature = sig.toDER('hex');
+    this.signature = sign.sign(privateKey, 'hex');
   }
 
   isValid() {
     if (this.fromAddress === null) return true;
 
     if (!this.signature || this.signature.length === 0) {
-      return true;
+      return false;
     }
 
     try {
-      const publicKey = crypto.createPublicKey({
-        key: Buffer.from(this.fromAddress, 'hex'),
-        format: 'der',
-        type: 'spki',
-      });
+      const verify = crypto.createVerify('SHA256');
+      verify.update(this.calculateHash());
+      verify.end();
 
-      return crypto.verify(
-        null,
-        Buffer.from(this.calculateHash()),
-        publicKey,
-        Buffer.from(this.signature, 'hex')
-      );
+      return verify.verify(this.fromAddress, this.signature, 'hex');
+    } catch {
+      return false;
+    }
+  } isValid() {
+    if (this.fromAddress === null) return true;
+
+    if (!this.signature || this.signature.length === 0) {
+      return false; // IMPORTANT
+    }
+
+    try {
+      const verify = crypto.createVerify('SHA256');
+      verify.update(this.calculateHash());
+      verify.end();
+
+      return verify.verify(this.fromAddress, this.signature, 'hex');
     } catch {
       return false;
     }

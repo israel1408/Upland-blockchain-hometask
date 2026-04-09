@@ -7,6 +7,7 @@ const TransactionForm = ({ onTransactionAdded }) => {
     fromAddress: '',
     toAddress: '',
     amount: '',
+    privateKey: '',
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -22,12 +23,24 @@ const TransactionForm = ({ onTransactionAdded }) => {
     setMessage('');
 
     try {
-      await addTransaction(formData.fromAddress, formData.toAddress, formData.amount);
+      await addTransaction(
+        formData.fromAddress,
+        formData.toAddress,
+        formData.amount,
+        formData.privateKey
+      );
       setMessage('Transaction added successfully!');
       setFormData({ fromAddress: '', toAddress: '', amount: '' });
       onTransactionAdded();
     } catch (err) {
-      setMessage(err.message || 'Failed to add transaction');
+      setMessage(
+        typeof err.response?.data?.error === 'string'
+          ? err.response.data.error
+          : err.response?.data?.error?.message ||
+          JSON.stringify(err.response?.data?.error) ||
+          err.message ||
+          'Failed to add transaction'
+      );
     } finally {
       setLoading(false);
     }
@@ -36,7 +49,7 @@ const TransactionForm = ({ onTransactionAdded }) => {
   return (
     <div className="transaction-form">
       <h2 className="panel-title">Create Transaction</h2>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="fromAddress">From Address</label>
@@ -50,7 +63,18 @@ const TransactionForm = ({ onTransactionAdded }) => {
             required
           />
         </div>
-        
+
+        <div className="form-group">
+          <label htmlFor="privateKey">Private Key</label>
+          <textarea
+            id="privateKey"
+            name="privateKey"
+            value={formData.privateKey}
+            onChange={handleChange}
+            placeholder="Paste your private key"
+            required />
+        </div>
+
         <div className="form-group">
           <label htmlFor="toAddress">To Address</label>
           <input
@@ -63,7 +87,7 @@ const TransactionForm = ({ onTransactionAdded }) => {
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="amount">Amount</label>
           <input
@@ -78,13 +102,13 @@ const TransactionForm = ({ onTransactionAdded }) => {
             required
           />
         </div>
-        
+
         {message && (
           <div className={`form-message ${message.includes('success') ? 'success' : 'error'}`}>
             {message}
           </div>
         )}
-        
+
         <button type="submit" className="submit-button" disabled={loading}>
           {loading ? 'Adding...' : 'Add Transaction'}
         </button>

@@ -18,11 +18,11 @@ const walletReady = axios.get(testpvkString)
 
 const blockchain = new Blockchain(difficulty, miningReward);
 
-if (config.demoData.enabled) {
-  config.demoData.transactions.forEach(({ from, to, amount }) => {
-    blockchain.addTransaction(new Transaction(from, to, amount));
-  });
-  blockchain.minePendingTransactions(initialMinerAddress);
-}
+// if (config.demoData.enabled) {
+//   config.demoData.transactions.forEach(({ from, to, amount }) => {
+//     blockchain.addTransaction(new Transaction(from, to, amount));
+//   });
+blockchain.minePendingTransactions(initialMinerAddress);
+// }
 
 module.exports = { blockchain, Transaction, walletReady, getWalletData: () => walletData };
