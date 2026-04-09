@@ -46,7 +46,33 @@ class Transaction {
     this.toAddress = toAddress;
     this.amount = amount;
     this.timestamp = Date.now();
-    this.signature = '';
+    this.signature = null;   // will be set after signing
+  }
+
+  /**
+   * Signs the transaction using the private key
+   * @param {string} signingKey - Private key in hex
+   */
+  signTransaction(signingKey) {
+    if (this.fromAddress === null) return; // mining reward
+
+    // Verify that the private key matches the fromAddress (public key)
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.from(this.fromAddress, 'hex'),
+      type: 'spki',
+      format: 'der'
+    });
+
+    // Create hash of the transaction
+    const transactionHash = this.calculateHash();
+
+    // Sign the hash
+    const sign = crypto.createSign('SHA256');
+    sign.update(transactionHash);
+    sign.end();
+
+    this.signature = sign.sign(signingKey, 'hex');
+    // Note: Since we store keys as hex DER, we need to create KeyObject or use Buffer
   }
 
   calculateHash() {
@@ -56,46 +82,27 @@ class Transaction {
       .digest('hex');
   }
 
-  signTransaction(privateKey) {
-    const sign = crypto.createSign('SHA256');
-    sign.update(this.calculateHash());
-    sign.end();
-
-    this.signature = sign.sign(privateKey, 'hex');
-  }
-
+  /**
+   * Verify transaction signature
+   */
   isValid() {
-    if (this.fromAddress === null) return true;
+    if (this.fromAddress === null) return true; // mining reward is always valid
 
     if (!this.signature || this.signature.length === 0) {
-      return false;
+      throw new Error('No signature in this transaction');
     }
 
-    try {
-      const verify = crypto.createVerify('SHA256');
-      verify.update(this.calculateHash());
-      verify.end();
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.from(this.fromAddress, 'hex'),
+      type: 'spki',
+      format: 'der'
+    });
 
-      return verify.verify(this.fromAddress, this.signature, 'hex');
-    } catch {
-      return false;
-    }
-  } isValid() {
-    if (this.fromAddress === null) return true;
+    const verify = crypto.createVerify('SHA256');
+    verify.update(this.calculateHash());
+    verify.end();
 
-    if (!this.signature || this.signature.length === 0) {
-      return false; // IMPORTANT
-    }
-
-    try {
-      const verify = crypto.createVerify('SHA256');
-      verify.update(this.calculateHash());
-      verify.end();
-
-      return verify.verify(this.fromAddress, this.signature, 'hex');
-    } catch {
-      return false;
-    }
+    return verify.verify(publicKey, this.signature, 'hex');
   }
 }
 

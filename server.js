@@ -12,6 +12,7 @@ const { apiLimiter } = require('./middleware/rateLimit.middleware');
 
 const apiRoutes = require('./routes');
 const healthRoutes = require('./routes/health.routes');
+const walletRoutes= require('./routes/wallets.routes');
 
 const app = express();
 
@@ -26,6 +27,8 @@ app.use('/health', healthRoutes);
 
 // ── API routes ─────────────────────────────────────────────────────────────────
 app.use('/api', apiLimiter, apiRoutes);
+
+app.use('/api/wallets', walletRoutes);
 
 // ── Static build (production) ──────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'build')));
