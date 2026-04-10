@@ -10,6 +10,7 @@ import useBlockchain from './hooks/useBlockchain';
 import { mineBlock } from './api/blockchain.api';
 
 import Wallet from './components/Wallet'; // new import
+import {WalletProvider} from './context/walletContext';
 
 function App() {
   const { chain, stats, loading, error, refresh } = useBlockchain();
@@ -33,6 +34,7 @@ function App() {
   }
 
   return (
+    <WalletProvider>
     <div className="App">
       <Header />
       <div className="app-container">
@@ -55,6 +57,7 @@ function App() {
         </div>
       </div>
     </div>
+  </WalletProvider>  
   );
 }
 

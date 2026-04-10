@@ -16,13 +16,17 @@ export const fetchAllTransactions = () =>
 // src/api/blockchain.api.js
 
 
-export const addTransaction = (from, to, amount, privateKey) => {
-  return client.post('/api/transactions', {
-    fromAddress: from,
-    toAddress: to,
+/**
+ * Add a new transaction (signs it on the backend using the provided private key)
+ */
+export const addTransaction = async (fromAddress, toAddress, amount, privateKey) => {
+  const response = await client.post(ENDPOINTS.TRANSACTIONS, {
+    fromAddress,
+    toAddress,
     amount,
-    privateKey, // send to backend
+    privateKey   // ← We send private key so backend can call signTransaction
   });
+  return response;
 };
 
 export const mineBlock = (miningRewardAddress = 'miner1') =>
@@ -36,7 +40,8 @@ export const fetchBalance = (address) =>
  * Create a new cryptographic wallet (POST /api/wallets)
  */
 export const createWallet = async () => {
-  const response = await client.post(ENDPOINTS.wallets);
+  // NEW (correct)
+  const response = await client.post(ENDPOINTS.WALLETS);
   return response;
 };
 

@@ -7,26 +7,21 @@ const addTransaction = (req, res) => {
   try {
     const { fromAddress, toAddress, amount, privateKey } = req.body;
 
-    const transaction = new Transaction(fromAddress, toAddress, amount);
-
-    //sign transaction using private key
-    if (privateKey) {
-      const sign = crypto.createSign('SHA256');
-      sign.update(transaction.calculateHash());
-      sign.end();
-
-      transaction.signature = sign.sign(privateKey, 'hex');
+    if (!fromAddress || !toAddress || !amount || !privateKey) {
+      return sendError(res, 400, 'Missing required fields: fromAddress, toAddress, amount, privateKey');
     }
+
+    const transaction = new Transaction(fromAddress, toAddress, amount);
+    transaction.signTransaction(privateKey); // SPENT A TON OF TIME JUST BECAUSE OF THIS LINE LOL!
 
     blockchain.addTransaction(transaction);
 
-    return sendSuccess(res, transaction);
-  } catch (err) {
-    console.log(err.response?.data);
+    logger.info('Transaction added', { from: fromAddress.substring(0, 16) + '...', amount });
 
-    return(
-      JSON.stringify(err.response?.data, null, 2)
-    );
+    return sendSuccess(res, 201, { transaction }, 'Transaction added to pending transactions');
+  } catch (error) {
+    logger.error('Add transaction failed', error);
+    return sendError(res, 400, error.message);
   }
 };
 

@@ -46,66 +46,78 @@ class Transaction {
     this.toAddress = toAddress;
     this.amount = amount;
     this.timestamp = Date.now();
-    this.signature = null;   // will be set after signing
+    this.signature = null;
   }
 
   /**
-   * Signs the transaction using the private key
-   * @param {string} signingKey - Private key in hex
+   * Calculate hash of the transaction
    */
-  signTransaction(signingKey) {
-    if (this.fromAddress === null) return; // mining reward
-
-    // Verify that the private key matches the fromAddress (public key)
-    const publicKey = crypto.createPublicKey({
-      key: Buffer.from(this.fromAddress, 'hex'),
-      type: 'spki',
-      format: 'der'
-    });
-
-    // Create hash of the transaction
-    const transactionHash = this.calculateHash();
-
-    // Sign the hash
-    const sign = crypto.createSign('SHA256');
-    sign.update(transactionHash);
-    sign.end();
-
-    this.signature = sign.sign(signingKey, 'hex');
-    // Note: Since we store keys as hex DER, we need to create KeyObject or use Buffer
-  }
-
   calculateHash() {
     return crypto
       .createHash('sha256')
-      .update(this.fromAddress + this.toAddress + this.amount + this.timestamp)
+      .update(
+        this.fromAddress +
+        this.toAddress +
+        this.amount.toString() +
+        this.timestamp.toString()
+      )
       .digest('hex');
+  }
+  /**
+   * Signs the transaction using the private key
+   * @param {string} signingKey - Private key in hex (DER pkcs8 format)
+   */
+  signTransaction(signingKey) {
+    if (this.fromAddress === null) {
+      return; // mining reward - no signature needed
+    }
+
+    if (!signingKey) {
+      throw new Error('Private key is required to sign the transaction');
+    }
+
+    const hash = this.calculateHash();
+
+    const sign = crypto.createSign('SHA256');
+    sign.update(hash);
+    sign.end();
+
+    //Correct signing for hex DER private key
+    this.signature = sign.sign({
+      key: Buffer.from(signingKey, 'hex'),
+      type: 'pkcs8',
+      format: 'der'
+    }, 'hex');
   }
 
   /**
-   * Verify transaction signature
+   * Verify if the transaction signature is valid
    */
   isValid() {
-    if (this.fromAddress === null) return true; // mining reward is always valid
+    if (this.fromAddress === null) return true; // mining reward
 
     if (!this.signature || this.signature.length === 0) {
       throw new Error('No signature in this transaction');
     }
 
-    const publicKey = crypto.createPublicKey({
-      key: Buffer.from(this.fromAddress, 'hex'),
-      type: 'spki',
-      format: 'der'
-    });
+    try {
+      const publicKey = crypto.createPublicKey({
+        key: Buffer.from(this.fromAddress, 'hex'),
+        type: 'spki',
+        format: 'der'
+      });
 
-    const verify = crypto.createVerify('SHA256');
-    verify.update(this.calculateHash());
-    verify.end();
+      const verify = crypto.createVerify('SHA256');
+      verify.update(this.calculateHash());
+      verify.end();
 
-    return verify.verify(publicKey, this.signature, 'hex');
+      return verify.verify(publicKey, this.signature, 'hex');
+    } catch (error) {
+      console.error('Signature verification failed:', error.message);
+      return false;
+    }
   }
 }
-
 class Blockchain {
   constructor(difficulty, miningReward) {
     this.chain = [this.createGenesisBlock()];
@@ -142,11 +154,24 @@ class Blockchain {
       throw new Error('Transaction must include from and to address');
     }
 
+    // Verify signature (this will throw if invalid or missing)
     if (!transaction.isValid()) {
-      throw new Error('Cannot add invalid transaction to chain');
+      throw new Error('Invalid transaction signature');
+    }
+
+    // Check balance (optional but good)
+    if (transaction.fromAddress !== null) {
+      const senderBalance = this.getBalanceOfAddress(transaction.fromAddress);
+      if (senderBalance < transaction.amount) {
+        throw new Error('Not enough balance');
+      }
     }
 
     this.pendingTransactions.push(transaction);
+    logger.info('Transaction added to pending', {
+      from: transaction.fromAddress.substring(0, 16) + '...',
+      amount: transaction.amount
+    });
   }
 
   getBalanceOfAddress(address) {

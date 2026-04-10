@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { createWallet } from '../api/blockchain.api';
+import { useWallet } from '../context/walletContext';
 
 const Wallet = () => {
-  const [wallet, setWallet] = useState(null);
+  const { wallet, generateWallet } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [privateKey, setPrivateKey] = useState(null); // kept only in memory
 
   const handleGenerateWallet = async () => {
     setLoading(true);
@@ -13,18 +13,11 @@ const Wallet = () => {
 
     try {
       const response = await createWallet();
-
       const { publicKey, privateKey: privKey } = response.data.data || response.data;
 
-      setWallet({ publicKey });
-      setPrivateKey(privKey);
-
-      alert(`✅ Wallet generated successfully!\n\nPublic Key (Address):\n${publicKey.substring(0, 50)}...`);
-
-      console.log('Private key stored locally only');
-
+      generateWallet(publicKey, privKey);
+      alert(` Wallet generated!\n\nPublic Key:\n${publicKey.substring(0, 50)}...`);
     } catch (err) {
-      console.error(err);
       setError(err.response?.data?.message || 'Failed to generate wallet');
     } finally {
       setLoading(false);
@@ -32,34 +25,24 @@ const Wallet = () => {
   };
 
   return (
-    <div style={{ padding: '20px', margin: '20px 0', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <div style={{ padding: '20px', margin: '20px 0', border: '1px solid #ccc', borderRadius: '10px', backgroundColor: '#f9f9f9' }}>
       <h2>🔑 Cryptographic Wallet</h2>
 
       {!wallet ? (
-        <button 
-          onClick={handleGenerateWallet} 
-          disabled={loading}
-          style={{ padding: '12px 24px', fontSize: '16px', cursor: 'pointer' }}
-        >
+        <button onClick={handleGenerateWallet} disabled={loading}>
           {loading ? 'Generating...' : 'Generate New Wallet'}
         </button>
       ) : (
         <div>
           <strong>Public Key (Wallet Address):</strong>
-          <p style={{ wordBreak: 'break-all', fontFamily: 'monospace', background: '#f5f5f5', padding: '10px' }}>
+          <p style={{ wordBreak: 'break-all', fontFamily: 'monospace', background: '#eef', padding: '10px' }}>
             {wallet.publicKey}
           </p>
-
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{ marginTop: '15px' }}
-          >
-            Generate Another Wallet
-          </button>
+          <button onClick={() => window.location.reload()}>Generate Another Wallet</button>
         </div>
       )}
 
-      {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
     </div>
   );
 };

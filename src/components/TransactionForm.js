@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import './TransactionForm.css';
 import { addTransaction } from '../api/blockchain.api';
+import { useWallet } from '../context/walletContext';
 
 const TransactionForm = ({ onTransactionAdded }) => {
-  const [formData, setFormData] = useState({
-    fromAddress: '',
-    toAddress: '',
-    amount: '',
-    privateKey: '',
-  });
+  const { privateKey, wallet } = useWallet();
+  const [formData, setFormData] = useState({ toAddress: '', amount: '' });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -19,28 +16,35 @@ const TransactionForm = ({ onTransactionAdded }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!wallet || !privateKey) {
+      setMessage('Please generate a wallet first!');
+      return;
+    }
+
+    if (!formData.toAddress || !formData.amount) {
+      setMessage('Please fill all fields');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
     try {
       await addTransaction(
-        formData.fromAddress,
-        formData.toAddress,
-        formData.amount,
-        formData.privateKey
+        wallet.publicKey,           // fromAddress
+        formData.toAddress,         // toAddress
+        parseFloat(formData.amount), // amount
+        privateKey                  // privateKey for signing on backend
       );
-      setMessage('Transaction added successfully!');
-      setFormData({ fromAddress: '', toAddress: '', amount: '' });
-      onTransactionAdded();
+
+      setMessage('✅ Transaction added successfully to pending transactions!');
+      setFormData({ toAddress: '', amount: '' });
+      onTransactionAdded && onTransactionAdded();
     } catch (err) {
-      setMessage(
-        typeof err.response?.data?.error === 'string'
-          ? err.response.data.error
-          : err.response?.data?.error?.message ||
-          JSON.stringify(err.response?.data?.error) ||
-          err.message ||
-          'Failed to add transaction'
-      );
+      console.error(err);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to add transaction';
+      setMessage(`❌ ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -48,31 +52,15 @@ const TransactionForm = ({ onTransactionAdded }) => {
 
   return (
     <div className="transaction-form">
-      <h2 className="panel-title">Create Transaction</h2>
-
+      <h3>Create Transaction</h3>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="fromAddress">From Address</label>
-          <input
-            type="text"
-            id="fromAddress"
-            name="fromAddress"
-            value={formData.fromAddress}
-            onChange={handleChange}
-            placeholder="e.g., address1"
-            required
+          <label>From (Your Wallet)</label>
+          <input 
+            type="text" 
+            value={wallet ? wallet.publicKey.substring(0, 40) + '...' : ''} 
+            readOnly 
           />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="privateKey">Private Key</label>
-          <textarea
-            id="privateKey"
-            name="privateKey"
-            value={formData.privateKey}
-            onChange={handleChange}
-            placeholder="Paste your private key"
-            required />
         </div>
 
         <div className="form-group">
@@ -83,8 +71,8 @@ const TransactionForm = ({ onTransactionAdded }) => {
             name="toAddress"
             value={formData.toAddress}
             onChange={handleChange}
-            placeholder="e.g., address2"
             required
+            placeholder="Paste recipient public key"
           />
         </div>
 
@@ -96,21 +84,20 @@ const TransactionForm = ({ onTransactionAdded }) => {
             name="amount"
             value={formData.amount}
             onChange={handleChange}
-            placeholder="e.g., 100"
-            step="0.01"
-            min="0"
             required
+            min="0.01"
+            step="0.01"
           />
         </div>
 
         {message && (
-          <div className={`form-message ${message.includes('success') ? 'success' : 'error'}`}>
+          <div className={`form-message ${message.includes('✅') ? 'success' : 'error'}`}>
             {message}
           </div>
         )}
 
-        <button type="submit" className="submit-button" disabled={loading}>
-          {loading ? 'Adding...' : 'Add Transaction'}
+        <button type="submit" disabled={loading || !wallet}>
+          {loading ? 'Sending Transaction...' : 'Send Transaction'}
         </button>
       </form>
     </div>
