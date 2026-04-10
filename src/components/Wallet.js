@@ -1,11 +1,30 @@
-import React, { useState } from 'react';
-import { createWallet } from '../api/blockchain.api';
+import React, { useEffect, useState } from 'react';
+import { createWallet, fetchBalance } from '../api/blockchain.api';
 import { useWallet } from '../context/walletContext';
 
 const Wallet = () => {
   const { wallet, generateWallet } = useWallet();
   const [loading, setLoading] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadBalance = async () => {
+      if (!wallet?.publicKey) return;
+      setBalanceLoading(true);
+      try {
+        const response = await fetchBalance(wallet.publicKey);
+        setBalance(response.data?.balance ?? response.data?.data?.balance ?? 0);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to fetch wallet balance');
+      } finally {
+        setBalanceLoading(false);
+      }
+    };
+
+    loadBalance();
+  }, [wallet]);
 
   const handleGenerateWallet = async () => {
     setLoading(true);
@@ -38,6 +57,8 @@ const Wallet = () => {
           <p style={{ wordBreak: 'break-all', fontFamily: 'monospace', background: '#eef', padding: '10px' }}>
             {wallet.publicKey}
           </p>
+          <strong>Balance:</strong>
+          <p>{balanceLoading ? 'Loading balance...' : balance}</p>
           <button onClick={() => window.location.reload()}>Generate Another Wallet</button>
         </div>
       )}

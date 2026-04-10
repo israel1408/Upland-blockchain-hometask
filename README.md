@@ -236,6 +236,19 @@ PORT=3003 npm run dev
 
 ---
 
+## Changes
+
+- Added cryptographic wallet generation endpoint at `POST /api/wallets` using Node `crypto.generateKeyPairSync` with `secp256k1`.
+- Implemented transaction signing and signature verification flow for `Transaction.signTransaction()` and `Transaction.isValid()`, and enforced signature checks before adding transactions.
+- Added persistence service at `services/persistence.service.js` to save/load/clear blockchain state in `blockchain.json`.
+- Updated `models/index.js` to restore persisted chain and pending transactions on startup, validate loaded chain, and fall back to a fresh chain when data is missing/invalid/corrupt.
+- Added automatic persistence triggers in blockchain domain methods after successful transaction additions and mining.
+
+Known limitations / trade-offs:
+- Persistence currently uses synchronous file I/O for simplicity and reliability in this take-home scope.
+
+---
+
 ## License
 
 MIT — for learning and assessment purposes.

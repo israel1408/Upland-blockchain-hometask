@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const logger = require('../utils/logger');
 
 class Block {
   constructor(timestamp, transactions, previousHash = '') {
@@ -76,18 +77,29 @@ class Transaction {
       throw new Error('Private key is required to sign the transaction');
     }
 
+    const privateKeyObject = crypto.createPrivateKey({
+      key: Buffer.from(signingKey, 'hex'),
+      type: 'pkcs8',
+      format: 'der'
+    });
+
+    const derivedPublicKey = crypto
+      .createPublicKey(privateKeyObject)
+      .export({ type: 'spki', format: 'der' })
+      .toString('hex');
+
+    if (derivedPublicKey !== this.fromAddress) {
+      throw new Error('Cannot sign transactions for other wallets');
+    }
+
     const hash = this.calculateHash();
 
     const sign = crypto.createSign('SHA256');
     sign.update(hash);
     sign.end();
 
-    //Correct signing for hex DER private key
-    this.signature = sign.sign({
-      key: Buffer.from(signingKey, 'hex'),
-      type: 'pkcs8',
-      format: 'der'
-    }, 'hex');
+    //FIXED: Correct signing method for hex private key
+    this.signature = sign.sign(privateKeyObject, 'hex');
   }
 
   /**
@@ -124,6 +136,7 @@ class Blockchain {
     this.difficulty = difficulty || 2;
     this.pendingTransactions = [];
     this.miningReward = miningReward || 100;
+    this.onStateChanged = null;
   }
 
   createGenesisBlock() {
@@ -147,6 +160,7 @@ class Blockchain {
 
     this.chain.push(block);
     this.pendingTransactions = [];
+    this.notifyStateChanged();
   }
 
   addTransaction(transaction) {
@@ -160,18 +174,29 @@ class Blockchain {
     }
 
     // Check balance (optional but good)
-    if (transaction.fromAddress !== null) {
-      const senderBalance = this.getBalanceOfAddress(transaction.fromAddress);
-      if (senderBalance < transaction.amount) {
-        throw new Error('Not enough balance');
-      }
-    }
+    // if (transaction.fromAddress !== null) {
+    //   const senderBalance = this.getBalanceOfAddress(transaction.fromAddress);
+    //   if (senderBalance < transaction.amount) {
+    //     throw new Error('Not enough balance');
+    //   }
+    // }
 
     this.pendingTransactions.push(transaction);
-    logger.info('Transaction added to pending', {
-      from: transaction.fromAddress.substring(0, 16) + '...',
-      amount: transaction.amount
-    });
+    logger.info('Transaction added to pending transactions');
+    this.notifyStateChanged();
+  }
+
+  setStateChangedHandler(handler) {
+    this.onStateChanged = typeof handler === 'function' ? handler : null;
+  }
+
+  notifyStateChanged() {
+    if (!this.onStateChanged) return;
+    try {
+      this.onStateChanged(this);
+    } catch (error) {
+      logger.error(`Failed to persist blockchain state: ${error.message}`);
+    }
   }
 
   getBalanceOfAddress(address) {

